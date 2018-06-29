@@ -176,7 +176,7 @@ def train(model):
     """Train the model."""
     # Training dataset.
     dataset_train = BalloonDataset()
-    dataset_train.load_balloon(args.dataset, "train")
+    dataset_train.load_balloon(dataset_path, "train")
     dataset_train.prepare()
 
     # Validation dataset
@@ -222,26 +222,18 @@ def detect_and_color_splash(model, image_path=None, video_path=None):
     if image_path:
         import cv2
         # Run model detection and generate the color splash effect
-        print("Running on {}".format(args.image))
+        print("Running on {}".format(image_path))
         # Read image
-        image = skimage.io.imread(args.image)
+        image = skimage.io.imread(image_path)
         # Detect objects
         r = model.detect([image], verbose=1)[0]
         # Color splash
-        splash = color_splash(image, r['masks'])
+        #splash = color_splash(image, r['masks'])
         rois = r['rois']
         print(r['rois'])
-
         for i in range(len(rois)):
-            cv2.rectangle(splash, (rois[i, 1], rois[i, 0]), (rois[i, 3], rois[i, 2]), (0, 255, 0), 2)
-        '''
-        visualize.display_instances(
-            image, r['rois'], r['masks'], r['class_ids'],
-            'balloon', r['scores'],
-            show_bbox=True, show_mask=True,
-            title="Predictions")
-        '''
-        cv2.imshow('image',splash)
+            cv2.rectangle(image, (rois[i, 1], rois[i, 0]), (rois[i, 3], rois[i, 2]), (0, 255, 0), 2)
+        cv2.imshow('image', image)
         cv2.waitKey(0)
         # Save output
         #print(r['rois'])
@@ -272,130 +264,86 @@ def detect_and_color_splash(model, image_path=None, video_path=None):
                 image = image[..., ::-1]
                 # Detect objects
                 r = model.detect([image], verbose=0)[0]
-                # Color splash
-                #rois: [N, (y1, x1, y2, x2)] detection bounding boxes
-                splash = color_splash(image, r['masks'])
                 rois = r['rois']
-                print(rois)
+                # Color splash
                 for i in range(len(rois)):
-                    cv2.rectangle(splash, (rois[i, 1], rois[i, 0]), (rois[i, 3], rois[i, 2]), (0, 255, 0), 2)
+                    cv2.rectangle(image, (rois[i, 1], rois[i, 0]), (rois[i, 3], rois[i, 2]), (0, 255, 0), 2)
+                #splash = color_splash(image, r['masks'])
                 # RGB -> BGR to save image to video
-                splash = splash[..., ::-1]
+                #splash = splash[..., ::-1]
                 # Add image to video writer
-                vwriter.write(splash)
-                cv2.imshow('image', splash)
-                cv2.waitKey(1000)
+                vwriter.write(image)
                 count += 1
         vwriter.release()
     print("Saved to ", file_name)
 
+def detect_and_color_splash(model, image_path=None, video_path=None):
+    assert image_path or video_path
+
+    # Image or video?
+    if image_path:
+        import cv2
+        # Run model detection and generate the color splash effect
+        print("Running on {}".format(image_path))
+        # Read image
+        image = skimage.io.imread(image_path)
+        # Detect objects
+        r = model.detect([image], verbose=1)[0]
+        # Color splash
+        #splash = color_splash(image, r['masks'])
+        rois = r['rois']
+        return rois
+    elif video_path:
+        import cv2
+        # Video capture
+        vcapture = cv2.VideoCapture(video_path)
+        width = int(vcapture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(vcapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = vcapture.get(cv2.CAP_PROP_FPS)
+
+        # Define codec and create video writer
+        file_name = "splash_{:%Y%m%dT%H%M%S}.avi".format(datetime.datetime.now())
+        vwriter = cv2.VideoWriter(file_name,
+                                  cv2.VideoWriter_fourcc(*'MJPG'),
+                                  fps, (width, height))
+
+        count = 0
+        success = True
+        while success:
+            print("frame: ", count)
+            # Read next image
+            success, image = vcapture.read()
+            if success:
+                # OpenCV returns images as BGR, convert to RGB
+                image = image[..., ::-1]
+                # Detect objects
+                r = model.detect([image], verbose=0)[0]
+                rois = r['rois']
+                # Color splash
+                for i in range(len(rois)):
+                    cv2.rectangle(image, (rois[i, 1], rois[i, 0]), (rois[i, 3], rois[i, 2]), (0, 255, 0), 2)
+                #splash = color_splash(image, r['masks'])
+                # RGB -> BGR to save image to video
+                #splash = splash[..., ::-1]
+                # Add image to video writer
+                vwriter.write(image)
+                count += 1
+        vwriter.release()
+    print("Saved to ", file_name)
+
+def detect_rois(model, image_path=None, video_path=None):
+    assert image_path or video_path
+    image = skimage.io.imread(image_path)
+    # Detect objects
+    r = model.detect([image], verbose=1)[0]
+    # Color splash
+    # splash = color_splash(image, r['masks'])
+    rois = r['rois']
+    return rois
 
 ############################################################
 #  Training
 ############################################################
-
-
-if __name__ == '__main__':
-    import argparse
-
-    # Parse command line arguments
-    parser = argparse.ArgumentParser(
-        description='Train Mask R-CNN to detect balloons.')
-    parser.add_argument("command",
-                        #default="splash",
-                        metavar="<command>",
-                        help="'train' or 'splash'")
-    parser.add_argument('--dataset', required=False,
-                        metavar="/path/to/balloon/dataset/",
-                        help='Directory of the Balloon dataset')
-    parser.add_argument('--weights', required=True,
-                        #default="D:\CH2\Mask_RCNN-master\mask_rcnn_balloon.h5",
-                        metavar="/path/to/weights.h5",
-                        help="Path to weights .h5 file or 'coco'")
-    parser.add_argument('--logs', required=False,
-                        default=DEFAULT_LOGS_DIR,
-                        metavar="/path/to/logs/",
-                        help='Logs and checkpoints directory (default=logs/)')
-    parser.add_argument('--image', required=False,
-                        #default='D:\CH2\Mask_RCNN-master\e88fd88226b8aecbb4cea8a6992994e5.jpg',
-                        metavar="path or URL to image",
-                        help='Image to apply the color splash effect on')
-    parser.add_argument('--video', required=False,
-                        metavar="path or URL to video",
-                        help='Video to apply the color splash effect on')
-    args = parser.parse_args()
-    '''
-    #args.command = "splash"
-    #args.weights = 'D:\CH2\Mask_RCNN-master\mask_rcnn_balloon.h5'
-   # args.image = 'D:\CH2\Mask_RCNN-master\e88fd88226b8aecbb4cea8a6992994e5.jpg'
-    '''
-
-    # Validate arguments
-    if args.command == "train":
-        assert args.dataset, "Argument --dataset is required for training"
-    elif args.command == "splash":
-        assert args.image or args.video,\
-               "Provide --image or --video to apply color splash"
-
-    print("Weights: ", args.weights)
-    print("Dataset: ", args.dataset)
-    print("Logs: ", args.logs)
-
-    # Configurations
-    if args.command == "train":
-        config = BalloonConfig()
-    else:
-        class InferenceConfig(BalloonConfig):
-            # Set batch size to 1 since we'll be running inference on
-            # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-            GPU_COUNT = 1
-            IMAGES_PER_GPU = 1
-        config = InferenceConfig()
-    config.display()
-
-    # Create model
-    if args.command == "train":
-        model = modellib.MaskRCNN(mode="training", config=config,
-                                  model_dir=args.logs)
-    else:
-        model = modellib.MaskRCNN(mode="inference", config=config,
-                                  model_dir=args.logs)
-
-    # Select weights file to load
-    if args.weights.lower() == "coco":
-        weights_path = COCO_WEIGHTS_PATH
-        # Download weights file
-        if not os.path.exists(weights_path):
-            utils.download_trained_weights(weights_path)
-    elif args.weights.lower() == "last":
-        # Find last trained weights
-        weights_path = model.find_last()[1]
-    elif args.weights.lower() == "imagenet":
-        # Start from ImageNet trained weights
-        weights_path = model.get_imagenet_weights()
-    else:
-        weights_path = args.weights
-
-    # Load weights
-    print("Loading weights ", weights_path)
-    if args.weights.lower() == "coco":
-        # Exclude the last layers because they require a matching
-        # number of classes
-        model.load_weights(weights_path, by_name=True, exclude=[
-            "mrcnn_class_logits", "mrcnn_bbox_fc",
-            "mrcnn_bbox", "mrcnn_mask"])
-    else:
-        model.load_weights(weights_path, by_name=True)
-
-    # Train or evaluate
-    if args.command == "train":
-        train(model)
-    elif args.command == "splash":
-        detect_and_color_splash(model, image_path=args.image,
-                                video_path=args.video)
-    else:
-        print("'{}' is not recognized. "
-              "Use 'train' or 'splash'".format(args.command))
         
 
 

@@ -1,18 +1,17 @@
-import os
 import cv2
 import numpy as np
 from sort import Sort
-import balloon
+import balloon.balloon as Balloon
 
 weights_path = 'D:\CH2\MyWork\Mask-Rcnn-Sort\mask_rcnn_balloon.h5'
+#weights_path = input("输入权重地址：")
 imagepath = ''
-logpath = balloon.DEFAULT_LOGS_DIR
+logpath = Balloon.DEFAULT_LOGS_DIR
 videopath = 'D:\CH2\MyWork\Mask-Rcnn-Sort\CatAndBalloon.mp4'
 sort_max_age = 5
 sort_min_hit = 3
 
-
-class InferenceConfig(balloon.BalloonConfig):
+class InferenceConfig(Balloon.BalloonConfig):
     # Set batch size to 1 since we'll be running inference on
     # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
     GPU_COUNT = 1
@@ -21,7 +20,7 @@ config1= InferenceConfig()
 config1.display()
 def Main():
     # Load weights
-    model = balloon.modellib.MaskRCNN(mode="inference", config=config1, model_dir=logpath)
+    model = Balloon.modellib.MaskRCNN(mode="inference", config=config1, model_dir=logpath)
     print("Loading weights ", weights_path)
     model.load_weights(weights_path, by_name=True)
     mot_tracker = Sort(sort_max_age, sort_min_hit)
@@ -32,7 +31,7 @@ def Main():
     height = int(vcapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = vcapture.get(cv2.CAP_PROP_FPS)
     # Define codec and create video writer
-    file_name = "splash_{:%Y%m%dT%H%M%S}.avi".format(balloon.datetime.datetime.now())
+    file_name = "splash_{:%Y%m%dT%H%M%S}.avi".format(Balloon.datetime.datetime.now())
     vwriter = cv2.VideoWriter(file_name,
                               cv2.VideoWriter_fourcc(*'MJPG'),
                               fps, (width, height))

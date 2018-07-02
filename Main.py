@@ -24,7 +24,6 @@ def Main():
     print("Loading weights ", weights_path)
     model.load_weights(weights_path, by_name=True)
     mot_tracker = Sort(sort_max_age, sort_min_hit)
-
     # evaluate
     vcapture = cv2.VideoCapture(videopath)
     width = int(vcapture.get(cv2.CAP_PROP_FRAME_WIDTH))
@@ -36,7 +35,6 @@ def Main():
                               cv2.VideoWriter_fourcc(*'MJPG'),
                               fps, (width, height))
     colours = np.random.rand(32, 3) * 255
-
     count = 0
     success = True
     while success:
@@ -48,7 +46,7 @@ def Main():
             r = model.detect([image], verbose=0)[0]
             result = r['rois']
             result = np.array(result)  # 变成array矩阵
-            print(result)
+            print('探测到的位置：','\n',result)
             det = result[:, 0:5]
             '''
             #print(det)
@@ -60,7 +58,7 @@ def Main():
             将图片位置交给sort处理，det格式为[[x1,y1,x2,y2,score],[x1,y1,x2,y2,score],...]
             '''
             trackers = mot_tracker.update(det)
-            print(trackers)
+            print('Sort跟踪器位置','\n',trackers)
             for d in trackers:
                 xmin = int(d[1])
                 ymin = int(d[0])
